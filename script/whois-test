@@ -324,6 +324,7 @@ use Readonly;
 use PDT::TS::Whois::Lexer;
 use PDT::TS::Whois::Validator qw( validate );
 use PDT::TS::Whois::Grammar qw( $grammar );
+use PDT::TS::Whois::GrammarThin qw( $grammarThin );
 use PDT::TS::Whois::Types;
 use PDT::TS::Whois::Redaction qw( parse_redaction_db add_redaction_types );
 use PDT::TS::Whois::Util qw( extract_roid scrub_u_label );
@@ -338,6 +339,7 @@ my $glob_types;
 
 my $opt_help;
 my $opt_man;
+my $opt_thin;
 my $opt_domain;
 my $opt_registrar;
 my $opt_nameserver;
@@ -413,6 +415,7 @@ sub main {
     GetOptions(
         "help|?"            => \$opt_help,
         "man"               => \$opt_man,
+	"thin"              => \$opt_thin,
         "domain|d=s"        => sub { $opt_domain = scrub_hostname( $_[1] ) or die "domain argument must be valid hostname" },
         "registrar|r=s"     => sub { $opt_registrar = scrub_postal_line( $_[1] ) or die "registrar argument must be valid postal line" },
         "nameserver|n=s"    => sub { $opt_nameserver = scrub_hostname( $_[1] ) or die "nameserver argument must be valid hostname" },
@@ -550,8 +553,13 @@ sub main {
     my ( $token ) = $lexer->peek_line();
     my $is_type_2 = ( $token eq 'multiple name servers line' );
 
+    # take care of thin registries by having a more relaxed grammar
+    my $myGrammar = $grammar;
+    if ( defined $opt_thin ) {
+	    $myGrammar = $grammarThin;
+    }
     # Unshift is used so that errors from callbacks go at the end of the list
-    unshift @errors, validate( rule => $rule, lexer => $lexer, grammar => $grammar, types => $glob_types );
+    unshift @errors, validate( rule => $rule, lexer => $lexer, grammar => $myGrammar, types => $glob_types );
 
     if ( defined $name_server_object_start_line && $matched_ip eq 'mismatch' ) {
         push @errors, sprintf "line %d: no IP Address in this nameserver section matched the one specified in --nameserver-ip", $name_server_object_start_line;
